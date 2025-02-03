@@ -3,16 +3,20 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../model/userModel");
 
+const getAllUsers = async (req, res) => {
+  const users = await User.find();
+  if (!users) return res.status(204).json({ message: "No users found" });
+  res.json(users);
+};
+
 const registerUser = asyncHandler(async (req, res) => {
   const { userName, password } = req.body;
-  console.log(req.body);
   if (!userName || !password) {
     res.sendStatus(400);
     throw new Error("All fields are mandatory");
   }
 
   const userAvailable = await User.findOne({ userName });
-  console.log("userAvailable", userAvailable);
 
   if (userAvailable) {
     res.sendStatus(400);
@@ -69,7 +73,7 @@ const loginUser = asyncHandler(async (req, res) => {
         },
       },
       process.env.REFRESH_TOKEN_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "1m" }
     );
 
     //store refresh token in db
@@ -79,7 +83,10 @@ const loginUser = asyncHandler(async (req, res) => {
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000,
+      // maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 1 * 60 * 1000,
+      secure: false, //secure true will block the cookie in http
+      sameSite: "Lax", // Required for cross-site cookies
     });
 
     res.status(201).json({ accessToken: accessToken, roles: userRoles });
@@ -99,6 +106,8 @@ const handleRefreshToken = async (req, res) => {
   console.log("handleRefreshToken controller");
   const cookies = req.cookies;
   if (!cookies?.refreshToken) {
+    console.log("no refresh token");
+
     res.sendStatus(401);
   }
   console.log(cookies, "cookies");
@@ -125,10 +134,10 @@ const handleRefreshToken = async (req, res) => {
             id: decoded.id,
           },
           process.env.ACCESS_TOKEN_SECRET,
-          { expiresIn: "2m" }
+          { expiresIn: "30s" }
         );
 
-        res.json({ accessToken });
+        res.json({ accessToken, roles: userRoles });
       }
     );
   } else {
@@ -141,7 +150,7 @@ const handleLogout = async (req, res) => {
   // On client, also delete the accessToken
 
   const cookies = req.cookies;
-  console.log("cookies", cookies);
+  console.log("logout cookies", cookies);
 
   if (!cookies?.refreshToken) return res.sendStatus(204); //No content
   const refreshToken = cookies.refreshToken;
@@ -165,6 +174,7 @@ const handleLogout = async (req, res) => {
 };
 
 module.exports = {
+  getAllUsers,
   registerUser,
   loginUser,
   currentUser,

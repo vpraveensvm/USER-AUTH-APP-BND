@@ -24,9 +24,8 @@ mongoose.connection.once("open", () => {
 
 app.use(cors(corsOptions));
 
-app.use("/api/contacts", require("./routes/contactRoutes"));
 app.use("/api/users", require("./routes/userRoutes"));
 
-//custom error handler middleware
-//default error-handling middleware function is added at the end of the middleware function stack
-// app.use(errorHandler);
+// custom error handler middleware
+// default error-handling middleware function is added at the end of the middleware function stack
+app.use(errorHandler);
