@@ -12,15 +12,13 @@ const getAllUsers = async (req, res) => {
 const registerUser = asyncHandler(async (req, res) => {
   const { userName, password } = req.body;
   if (!userName || !password) {
-    res.sendStatus(400);
-    throw new Error("All fields are mandatory");
+    return res.status(400).json({ message: "All fields are mandatory!" });
   }
 
   const userAvailable = await User.findOne({ userName });
 
   if (userAvailable) {
-    res.sendStatus(400);
-    throw new Error("User exist with this Username!");
+    return res.status(400).json({ message: "User exists with this Username!" });
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -32,22 +30,16 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   if (user) {
-    console.log("User created", user);
     res.status(201).json({ _id: user.id, userName: user.userName });
   } else {
-    res.sendStatus(400);
-    console.log("User creation failed");
-    throw new Error("User registration failed!");
+    return res.status(400).json({ message: "User creation failed" });
   }
 });
 
 const loginUser = asyncHandler(async (req, res) => {
   const { userName, password } = req.body;
-  console.log("username", userName);
-  console.log("password", password);
   if (!userName || !password) {
-    res.sendStatus(400);
-    throw new Error("All fields are mandatory");
+    return res.status(400).json({ message: "All fields are mandatory" });
   }
 
   const user = await User.findOne({ userName });
@@ -77,7 +69,6 @@ const loginUser = asyncHandler(async (req, res) => {
     );
 
     //store refresh token in db
-
     user.refreshToken = refreshToken;
     await user.save();
 
@@ -95,25 +86,12 @@ const loginUser = asyncHandler(async (req, res) => {
   }
 });
 
-const currentUser = asyncHandler(async (req, res) => {
-  console.log("current");
-  console.log("User data from authtoken", req.user);
-  console.log("User data from authtoken", req.roles);
-  res.status(201).json(req.user);
-});
-
 const handleRefreshToken = async (req, res) => {
-  console.log("handleRefreshToken controller");
   const cookies = req.cookies;
   if (!cookies?.refreshToken) {
-    console.log("no refresh token");
-
-    res.sendStatus(401);
+    return res.status(401).json({ message: "No refresh token found" });
   }
-  console.log(cookies, "cookies");
-
   const refreshToken = cookies.refreshToken;
-
   const foundUser = await User.findOne({ refreshToken });
 
   if (foundUser) {
@@ -121,7 +99,8 @@ const handleRefreshToken = async (req, res) => {
       refreshToken,
       process.env.REFRESH_TOKEN_SECRET,
       (err, decoded) => {
-        if (err) return res.sendStatus(401);
+        if (err)
+          return res.status(401).json({ message: "All fields are mandatory" });
 
         const userRoles = Object.values(foundUser.roles);
 
@@ -141,43 +120,41 @@ const handleRefreshToken = async (req, res) => {
       }
     );
   } else {
-    res.sendStatus(401);
-    throw new Error(err);
+    return res
+      .status(401)
+      .json({ message: "User not found with this refresh token." });
   }
 };
 
 const handleLogout = async (req, res) => {
-  // On client, also delete the accessToken
-
   const cookies = req.cookies;
-  console.log("logout cookies", cookies);
 
-  if (!cookies?.refreshToken) return res.sendStatus(204); //No content
+  if (!cookies?.refreshToken)
+    return res.status(204).json({ message: "Refresh token not found" }); //No content
   const refreshToken = cookies.refreshToken;
 
   // Is refreshToken in db?
   const foundUser = await User.findOne({ refreshToken });
 
-  console.log("foundUser", foundUser);
-
   if (!foundUser) {
     // sameSite: "None", secure: true - add this for production(https)
     res.clearCookie("refreshToken", { httpOnly: true });
-    return res.sendStatus(204);
+    return res
+      .status(204)
+      .json({ message: "User not found with this refresh token" });
   }
 
   await User.updateOne({ _id: foundUser._id }, { refreshToken: "" });
 
   // sameSite: "None", secure: true - add this for production(https)
   res.clearCookie("refreshToken", { httpOnly: true });
-  res.sendStatus(204);
+  return res.status(204).json({ message: "Logged out succeffully" });
 };
 
 module.exports = {
   getAllUsers,
   registerUser,
   loginUser,
-  currentUser,
   handleRefreshToken,
   handleLogout,
 };
